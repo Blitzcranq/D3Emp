@@ -50,83 +50,121 @@ document.addEventListener('DOMContentLoaded', function () {
 // Function to draw the lollipop chart for the selected country
 function drawLollipopChart(selectedCountry) {
     // Filter data for the selected country
-    console.log(selectedCountry);
-
-    let filteredMaleData = male_data.map(d => ({ Year: +d["Year"], Employment_Rate: +d[selectedCountry] }));
-    let filteredFemaleData = female_data.map(d => ({ Year: +d["Year"], Employment_Rate: +d[selectedCountry] }));
-    console.log(male_data);
-    console.log(filteredMaleData);
-    console.log(filteredFemaleData);
-
-    // Get all years from the data
-    const allYears = male_data.map(d => +d["Year"]);
-    console.log(allYears);
+    const parseYear = d3.timeParse("%Y");
+    let filteredMaleData = male_data.map(d => ({ Year: parseYear(d["Year"]), Employment_Rate: +d[selectedCountry] }));
+    let filteredFemaleData = female_data.map(d => ({ Year: parseYear(d["Year"]), Employment_Rate: +d[selectedCountry] }));
 
     // Scales
-    const xScale = d3.scaleBand()
-        .domain([allYears[0] - 1, ...allYears])
-        .range([0, width])
-        .padding(1)
-        .align(0);
+    const xScale = d3.scaleTime()
+        .domain([new Date("1990-01-01T00:00:00"), new Date("2023-01-01T00:00:00")])  // Use the extent of the parsed dates
+        .range([0, width]);
+
+    const yMax = d3.max([...filteredMaleData, ...filteredFemaleData], d => Math.max(+d.Employment_Rate));
 
     const yScale = d3.scaleLinear()
-        .domain([0, d3.max([...filteredMaleData, ...filteredFemaleData], d => Math.max(+d.Employment_Rate))])
+        .domain([0, yMax])
         .range([height, 0]);
 
-    // Remove previous chart content
-    svg.selectAll("*").remove();
+    // Transition for axes
+    const transition = d3.transition().duration(1000);
 
-    // Add axes
+    // Update x-axis
+    svg.selectAll(".x-axis").remove();
     svg.append("g")
+        .attr("class", "x-axis")
         .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(xScale).tickFormat(d3.format("d")).tickValues(d3.range(1990, 2025, 5)));
+        .call(d3.axisBottom(xScale));
 
-    svg.append("g")
-        .call(d3.axisLeft(yScale)); // Employment rates on y-axis
+    // Smooth transition for y-axis
+    svg.selectAll(".y-axis")
+        .transition(transition)
+        .call(d3.axisLeft(yScale));
 
-    // Draw lollipops for male data
-    svg.selectAll(".line-male")
-        .data(filteredMaleData)
-        .enter()
-        .append("line")
-        .attr("x1", d => xScale(+d.Year) - 5)
-        .attr("x2", d => xScale(+d.Year) - 5)
-        .attr("y1", yScale(0))
-        .attr("y2", d => yScale(+d.Employment_Rate))
-        .attr("stroke", "teal");
+    // if the y-axis doesn't exist (first time), append it
+    svg.selectAll(".y-axis").data([null])
+        .join(
+            enter => enter.append("g")
+                .attr("class", "y-axis")
+                .call(d3.axisLeft(yScale))
+        );
 
-    svg.selectAll(".circle-male")
-        .data(filteredMaleData)
-        .enter()
-        .append("circle")
-        .attr("cx", d => xScale(+d.Year) - 5)
-        .attr("cy", d => yScale(+d.Employment_Rate))
-        .attr("r", 4)
-        .attr("fill", "teal");
+    // Update lollipops for male data
+    const maleLines = svg.selectAll(".line-male")
+        .data(filteredMaleData);
 
-    // Draw lollipops for female data
-    svg.selectAll(".line-female")
-        .data(filteredFemaleData)
-        .enter()
-        .append("line")
-        .attr("x1", d => xScale(+d.Year) + 10 - 5)
-        .attr("x2", d => xScale(+d.Year) + 10 - 5)
-        .attr("y1", yScale(0))
-        .attr("y2", d => yScale(+d.Employment_Rate))
-        .attr("stroke", "deeppink");
+    maleLines.join(
+        enter => enter.append("line")
+            .attr("class", "line-male")
+            .attr("x1", d => xScale(d.Year) - 5)
+            .attr("x2", d => xScale(d.Year) - 5)
+            .attr("y1", yScale(0))
+            .attr("y2", yScale(0))
+            .attr("stroke", "teal")
+            .transition(transition)
+            .attr("y2", d => yScale(d.Employment_Rate)),
+        update => update.transition(transition)
+            .attr("x1", d => xScale(d.Year) - 5)
+            .attr("x2", d => xScale(d.Year) - 5)
+            .attr("y2", d => yScale(d.Employment_Rate))
+    );
 
-    svg.selectAll(".circle-female")
-        .data(filteredFemaleData)
-        .enter()
-        .append("circle")
-        .attr("cx", d => xScale(+d.Year) + 10 - 5)
-        .attr("cy", d => yScale(+d.Employment_Rate))
-        .attr("r", 4)
-        .attr("fill", "deeppink");
+    const maleCircles = svg.selectAll(".circle-male")
+        .data(filteredMaleData);
+
+    maleCircles.join(
+        enter => enter.append("circle")
+            .attr("class", "circle-male")
+            .attr("cx", d => xScale(d.Year) - 5)
+            .attr("cy", yScale(0))
+            .attr("r", 4)
+            .attr("fill", "teal")
+            .transition(transition)
+            .attr("cy", d => yScale(d.Employment_Rate)),
+        update => update.transition(transition)
+            .attr("cx", d => xScale(d.Year) - 5)
+            .attr("cy", d => yScale(d.Employment_Rate))
+    );
+
+    // Update lollipops for female data
+    const femaleLines = svg.selectAll(".line-female")
+        .data(filteredFemaleData);
+
+    femaleLines.join(
+        enter => enter.append("line")
+            .attr("class", "line-female")
+            .attr("x1", d => xScale(d.Year) + 5)
+            .attr("x2", d => xScale(d.Year) + 5)
+            .attr("y1", yScale(0))
+            .attr("y2", yScale(0))
+            .attr("stroke", "deeppink")
+            .transition(transition)
+            .attr("y2", d => yScale(d.Employment_Rate)),
+        update => update.transition(transition)
+            .attr("x1", d => xScale(d.Year) + 5)
+            .attr("x2", d => xScale(d.Year) + 5)
+            .attr("y2", d => yScale(d.Employment_Rate))
+    );
+
+    const femaleCircles = svg.selectAll(".circle-female")
+        .data(filteredFemaleData);
+
+    femaleCircles.join(
+        enter => enter.append("circle")
+            .attr("class", "circle-female")
+            .attr("cx", d => xScale(d.Year) + 5)
+            .attr("cy", yScale(0))
+            .attr("r", 4)
+            .attr("fill", "deeppink")
+            .transition(transition)
+            .attr("cy", d => yScale(d.Employment_Rate)),
+        update => update.transition(transition)
+            .attr("cx", d => xScale(d.Year) + 5)
+            .attr("cy", d => yScale(d.Employment_Rate))
+    );
 
     // Add legend
     const legend = svg.append("g")
-        .attr("transform", `translate(${width - 100}, -40)`);
+        .attr("transform", `translate(${width - 250}, -45)`);
 
     legend.append("rect")
         .attr("x", 0)
