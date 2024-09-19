@@ -2,8 +2,8 @@
 
 let svg;
 let female_data, male_data;
-let margin = { top: 50, right: 150, bottom: 50, left: 100 },
-    width = 1200 - margin.left - margin.right,
+let margin = { top: 50, right: 80, bottom: 50, left: 80 },
+    width = 1000 - margin.left - margin.right,
     height = 600 - margin.top - margin.bottom;
 
 // This function is called once the HTML page is fully loaded by the browser
